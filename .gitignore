@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 
 # IGNORE PROPIO:
+data/
 data/creds/gpt_id.json
 gpt_id.json
 
