@@ -10,11 +10,14 @@
 # Imports&Settings
 ##################
 import numpy as np
+import pandas as pd
 import os
 import re
 import io
 import pypdf
 import langchain
+from langchain.document_loaders.csv_loader import CSVLoader
+from langchain.indexes import VectorstoreIndexCreator
 import openai
 
 # API KEY:
@@ -46,30 +49,148 @@ def limpieza_texto(texto: str) -> str:
     texto = re.sub(r"\n\s*\n", "\n\n", texto)
     return texto
 
-def extract_text_from_pdf(pdf_path: str) -> str:
+def tabla_a_texto(tabla):
+    '''
+    Función para convertir una tabla de pandas en un texto.
+    La idea es identificar los nombres de columna e índices correctos y
+    a partir de ahí generar un texto que pueda ser procesado por el modelo.
+    '''
+    tabla = tabla.copy()
+    
+    # Tamaño mínimo de tabla para que sea válida = 2x2
+    if sum(tabla.shape) < 4:
+        return ''
+    
+    # Lista de valores que consideramos NaN:
+    nan_equivalents = [np.NaN, np.nan,
+                       'nan', 'NaN', 'Nan', 'NAN', 'na', 'NA',
+                       'Unnamed:0', 'Unnamed: 0'
+                       '', '-', ' ', '  ', '   ']
+    
+    # Asumimos que el primer elemento es el título salvo si es NaN:
+    titulo = tabla.columns[0] if tabla.columns[0] not in nan_equivalents else ''
+    
+    # Asumimos que la primera columna es el índice y la eliminamos:
+    tabla.index = tabla[tabla.columns[0]].values
+    tabla.drop(columns=tabla.columns[0], inplace=True)
+
+    # Si las columnas tienen muchos 'Unnamed' suele ser porque hay
+    # varias líneas de texto. En ese caso, las juntamos en una sola:
+    if sum(['Unnamed' in i for i in tabla.columns]) > 2:
+        nueva_columna = [f'{tabla.columns[i]} {tabla.iloc[0,i]}'
+                         for i in range(len(tabla.columns))]
+        nueva_columna = [i.replace('Unnamed: ','') for i in nueva_columna]
+        tabla.columns = nueva_columna
+
+    
+    # Eliminamos las filas y columnas que no tienen datos:
+    tabla.replace(nan_equivalents, np.nan, inplace=True)
+    tabla.dropna(axis=0, how='all', inplace=True)
+    tabla.dropna(axis=1, how='all', inplace=True)
+    
+    # Check si las columnas son años:
+    col_años = False
+    years_txt=[str(i) for i in range(2015,2022)]
+    years_int=[i for i in range(2015,2022)]
+    years = set(years_txt+years_int)
+    cruce = set(tabla.columns).intersection(set(years))
+    if len(cruce) > 0: col_años=True
+    
+    # Si no son años las columnas, buscamos filas que sean años:
+    contexto = None
+    if not col_años:
+        for i in tabla.iterrows():
+            #print(i[1].values)
+            try:
+                cruce = set(i[1].values).intersection(set(years))
+            except:
+                cruce=[]
+            if len(cruce)>0: # Si encontramos una fila con años:
+                # Asignamos los años a las columnas:
+                tabla.columns = i[1].values
+                try: 
+                    contexto = i[1].name
+                except:
+                    contexto = None
+                # Drop de la fila:
+                tabla.drop(i[0], inplace=True)
+                break
+    # Los procesos anteriores pueden haber dejado filas vacías, las eliminamos:
+    tabla.replace(nan_equivalents, np.nan, inplace=True)
+    tabla.dropna(axis=0, how='all', inplace=True)
+    tabla.dropna(axis=1, how='all', inplace=True)
+    # Pasamos a texto:
+    texto = ''
+    for i in tabla.items():
+        txt = [f' {titulo} + {i[0]} + {x[0]} = {x[1]}; '
+            for x in list(i[1].items())]
+        add= ''.join(txt)
+        if contexto:
+            txt = [f' {titulo} + {contexto} + {i[0]} + {x[0]} = {x[1]}; '
+                for x in list(i[1].items())]
+            add = ''.join(txt)
+        add = add.replace('  ',' ').replace('\n','; ').replace('  ','')
+        texto += f';  Tabla={titulo}: {add}'
+    return texto
+
+def extract_text_from_pdf(pdf_path: str) -> list:
     '''
     Función para extraer texto de un pdf y limpiarlo.
     Devuelve una lista de str, cada una es una página del pdf.
     '''
     # Abrimos el pdf
     with open(pdf_path, 'rb') as f:
-        pdf = pypdf.PdfFileReader(f)
+        pdf = pypdf.PdfReader(f)
         # Obtenemos el número de páginas
         num_pags = pdf.getNumPages()
         count = 0
         text = []
         # Iteramos sobre las páginas
-        while count < num_pags:
-            pag = pdf.getPage(count)
+        for pag in pdf.pages:
             count +=1
-            texto_pagina = pag.extractText()
+            texto_pagina = pag.extract_text()
+            tablas = tabula.read_pdf(pdf_path, pages=count)
+            for tabla in tablas:
+                texto_pagina += f'; {tabla_a_texto(tabla=tabla)}; '
             texto_pagina = limpieza_texto(texto_pagina)
             text.append(texto_pagina)
     return text
 
 #############################
+# Langchain query motor
+#############################
+def save_text_pdf_to_csv(save_path: str, text: list):
+    '''
+    Función para guardar el texto procesado de un pdf en un csv.
+    Lo hace de tal forma que cada hoja del doc sea una fila en csv.
+    '''
+    text = text.copy()
+    with open(save_path, 'w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerows([[str(i)] for i in text])
+    return
+
+def create_index_from_csv(csv_path: str):
+    '''
+    Función para crear un índice de búsqueda de un csv.
+    '''
+    # Cargamos el csv
+    loader = CSVLoader(file_path=csv_path)
+    # Creamos el índice
+    index = VectorstoreIndexCreator().from_loaders([loader])
+    return index
+    
+#############################
 # OpenAI embeddings & queries
 #############################
+'''
+DEPRECATED
+El objetivo de esta sección era noble, pero en el mundo actual y a
+la velocidad que dan las cosas era evidente que esto iba a ser 'mucho trabajo'
+OBVIAMENTE esto ya se ha implementado de manera directa en otras librerías.
+Es por esto que se usa e implementa el bloque 'LANGCHAIN'.
+Se deja el código como un homenaje a la idea original.
+'''
 '''
 Llamadas a la API de OpenAI para obtener embeddings y hacer queries.
 Funciones simples que dado un texto devuelven embeddings y dado un input
@@ -88,6 +209,26 @@ def get_embeddings(text: str, model: str = "ada") -> np.array:
     )
     # Devolvemos los embeddings
     return np.array(response['embedding'])
+
+def chop_text(text: list, size:str=1000, overlap: int=50):
+    splitter = langchain.text_splitter.RecursiveCharacterTextSplitter(
+        chunk_size=size,
+        overlap=overlap,
+        length_function = len)
+    
+    docs = splitter.create_documents(text,
+                                     metadatas=[
+                                         {'pag': i} 
+                                         for i in list(range(len(text)))])
+    return docs
+
+def vector_store_embeddings(docs: list, model: str = "ada"):
+    # Creamos el índice
+    embeddings = [get_embeddings(doc.page_content, model=model)
+                  for doc in docs]
+    store = langchain.vectorstores.Chroma.from_documents(docs,
+                                                         embeddings)
+    return store
 
 # MENSAJE GPT-3.5:
 def send_message(message_log,
