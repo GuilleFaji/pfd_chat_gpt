@@ -49,7 +49,7 @@ def limpieza_texto(texto: str) -> str:
     texto = re.sub(r"\n\s*\n", "\n\n", texto)
     return texto
 
-def tabla_a_texto(tabla):
+def tabla_a_texto(tabla, año_actual=None):
     '''
     Función para convertir una tabla de pandas en un texto.
     La idea es identificar los nombres de columna e índices correctos y
@@ -62,13 +62,13 @@ def tabla_a_texto(tabla):
         return ''
     
     # Lista de valores que consideramos NaN:
-    nan_equivalents = [np.NaN, np.nan,
+    nan_equiv = [np.NaN, np.nan,
                        'nan', 'NaN', 'Nan', 'NAN', 'na', 'NA',
                        'Unnamed:0', 'Unnamed: 0'
                        '', '-', ' ', '  ', '   ']
     
     # Asumimos que el primer elemento es el título salvo si es NaN:
-    titulo = tabla.columns[0] if tabla.columns[0] not in nan_equivalents else ''
+    titulo = tabla.columns[0] if tabla.columns[0] not in nan_equiv else ''
     
     # Asumimos que la primera columna es el índice y la eliminamos:
     tabla.index = tabla[tabla.columns[0]].values
@@ -84,7 +84,12 @@ def tabla_a_texto(tabla):
 
     
     # Eliminamos las filas y columnas que no tienen datos:
-    tabla.replace(nan_equivalents, np.nan, inplace=True)
+    '''
+    ToDo: filas vacías con NaN muchas veces implican
+    que el índice de la fila es parte del texto del índice
+    de la siguiente fila. Hacer algo para que se unan
+    '''
+    tabla.replace(nan_equiv, np.nan, inplace=True)
     tabla.dropna(axis=0, how='all', inplace=True)
     tabla.dropna(axis=1, how='all', inplace=True)
     
@@ -114,22 +119,35 @@ def tabla_a_texto(tabla):
                     contexto = None
                 # Drop de la fila:
                 tabla.drop(i[0], inplace=True)
+                col_años=True
                 break
-    # Los procesos anteriores pueden haber dejado filas vacías, las eliminamos:
-    tabla.replace(nan_equivalents, np.nan, inplace=True)
+    
+    # Si las columnas son años y hemos pasado un año actual, nos lo quedamos
+    if col_años and año_actual:
+        tabla = tabla[tabla.columns[tabla.columns==año_actual]]
+        
+    
+    # Procesos anteriores pueden haber dejado filas vacías, las eliminamos:
+    tabla.replace(nan_equiv, np.nan, inplace=True)
     tabla.dropna(axis=0, how='all', inplace=True)
     tabla.dropna(axis=1, how='all', inplace=True)
     # Pasamos a texto:
     texto = ''
     for i in tabla.items():
+        # Lista con cada combinatoria columna-fila-valor:
         txt = [f' {titulo} + {i[0]} + {x[0]} = {x[1]}; '
-            for x in list(i[1].items())]
+               for x in list(i[1].items())]
+        
+        # Pasamos a texto:
         add= ''.join(txt)
         if contexto:
             txt = [f' {titulo} + {contexto} + {i[0]} + {x[0]} = {x[1]}; '
-                for x in list(i[1].items())]
+                   for x in list(i[1].items())]
+            
             add = ''.join(txt)
+        
         add = add.replace('  ',' ').replace('\n','; ').replace('  ','')
+        
         texto += f';  Tabla={titulo}: {add}'
     return texto
 
