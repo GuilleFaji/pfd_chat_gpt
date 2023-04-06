@@ -11,19 +11,24 @@
 ##################
 import numpy as np
 import pandas as pd
+import csv
 import os
 import re
 import io
+import json
 import pypdf
 import langchain
 from langchain.document_loaders.csv_loader import CSVLoader
 from langchain.indexes import VectorstoreIndexCreator
+import pyllamacpp
+import tabula
 import openai
 
 # API KEY:
 # ToDo: Cambiar a variable de entorno
 api_key = json.load(open('./data/creds/gpt_id.json'))['api_key']
 openai.api_key = api_key
+os.environ['OPENAI_API_KEY'] = api_key
 
 ###############
 # Text Handling
