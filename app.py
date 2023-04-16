@@ -197,14 +197,14 @@ def qa_result(_):
             convos.extend([
                 pn.Row(
                     pn.panel("\U0001F60A", width=10),
-                    f'*{prompt_text}*',
+                    f'<font size="3">**{prompt_text}**</font>',
                     width=600
                 ),
                 pn.Row(
                     pn.panel("\U0001F916", width=10),
                     pn.Column(
-                        result["result"],
-                        "*Contexto Importante:*",
+                        f'<font size="3">**{result["result"]}**</font>',
+                        "**Contexto Importante:**",
                         contexto
                     )
                 )
@@ -254,7 +254,7 @@ pn.Row(
         
         - Si guardas tu clave en el archivo `data/creds/gpt_id.json` no será necesario introducirla
         
-        - Usar OpenAI tiene costes, vigílalos en [*OpenAI*](https://platform.openai.com/account).
+        - Usar OpenAI tiene costes, vigílalos en [**OpenAI**](https://platform.openai.com/account).
         
         **3) Realiza preguntas en el apartado inferior.**
         
