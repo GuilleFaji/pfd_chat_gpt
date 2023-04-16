@@ -16,13 +16,19 @@ import os
 import re
 import io
 import json
+
 import pypdf
+import tabula
+
+import openai
+import pyllamacpp
+import tiktoken
+
 import langchain
 from langchain.document_loaders.csv_loader import CSVLoader
 from langchain.indexes import VectorstoreIndexCreator
-import pyllamacpp
-import tabula
-import openai
+from langchain.callbacks.base import CallbackManager
+from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 
 # API KEY:
 # ToDo: Cambiar a variable de entorno
@@ -37,7 +43,7 @@ os.environ['OPENAI_API_KEY'] = api_key
 '''
 Funciones para manejo de texto.
 Principalmente extractar texto de pdfs y limpiarlo.
-En un futuro se podrían añadir funciones para extraer texto de otros formatos
+En un futuro se podrían anyadir funciones para extraer texto de otros formatos
 e incluso de imágenes utilizando las últimas habilidades de GPT (se podrían
 convertir gráficos a su equivalente en tablas de datos, json, etc.).
 '''
@@ -54,7 +60,7 @@ def limpieza_texto(texto: str) -> str:
     texto = re.sub(r"\n\s*\n", "\n\n", texto)
     return texto
 
-def tabla_a_texto(tabla, año_actual=None):
+def tabla_a_texto(tabla, anyo_actual=None):
     '''
     Función para convertir una tabla de pandas en un texto.
     La idea es identificar los nombres de columna e índices correctos y
@@ -62,7 +68,7 @@ def tabla_a_texto(tabla, año_actual=None):
     '''
     tabla = tabla.copy()
     
-    # Tamaño mínimo de tabla para que sea válida = 2x2
+    # Tamanyo mínimo de tabla para que sea válida = 2x2
     if sum(tabla.shape) < 4:
         return ''
     
@@ -98,25 +104,25 @@ def tabla_a_texto(tabla, año_actual=None):
     tabla.dropna(axis=0, how='all', inplace=True)
     tabla.dropna(axis=1, how='all', inplace=True)
     
-    # Check si las columnas son años:
-    col_años = False
+    # Check si las columnas son anyos:
+    col_anyos = False
     years_txt=[str(i) for i in range(2015,2022)]
     years_int=[i for i in range(2015,2022)]
     years = set(years_txt+years_int)
     cruce = set(tabla.columns).intersection(set(years))
-    if len(cruce) > 0: col_años=True
+    if len(cruce) > 0: col_anyos=True
     
-    # Si no son años las columnas, buscamos filas que sean años:
+    # Si no son anyos las columnas, buscamos filas que sean anyos:
     contexto = None
-    if not col_años:
+    if not col_anyos:
         for i in tabla.iterrows():
             #print(i[1].values)
             try:
                 cruce = set(i[1].values).intersection(set(years))
             except:
                 cruce=[]
-            if len(cruce)>0: # Si encontramos una fila con años:
-                # Asignamos los años a las columnas:
+            if len(cruce)>0: # Si encontramos una fila con anyos:
+                # Asignamos los anyos a las columnas:
                 tabla.columns = i[1].values
                 try: 
                     contexto = i[1].name
@@ -124,12 +130,12 @@ def tabla_a_texto(tabla, año_actual=None):
                     contexto = None
                 # Drop de la fila:
                 tabla.drop(i[0], inplace=True)
-                col_años=True
+                col_anyos=True
                 break
     
-    # Si las columnas son años y hemos pasado un año actual, nos lo quedamos
-    if col_años and año_actual:
-        tabla = tabla[tabla.columns[tabla.columns==año_actual]]
+    # Si las columnas son anyos y hemos pasado un anyo actual, nos lo quedamos
+    if col_anyos and anyo_actual:
+        tabla = tabla[tabla.columns[tabla.columns==anyo_actual]]
         
     
     # Procesos anteriores pueden haber dejado filas vacías, las eliminamos:
@@ -156,27 +162,28 @@ def tabla_a_texto(tabla, año_actual=None):
         texto += f';  Tabla={titulo}: {add}'
     return texto
 
-def extract_text_from_pdf(pdf_path: str) -> list:
+def extract_text_from_pdf(pdf_path) -> list:
     '''
     Función para extraer texto de un pdf y limpiarlo.
     Devuelve una lista de str, cada una es una página del pdf.
     '''
     # Abrimos el pdf
-    with open(pdf_path, 'rb') as f:
-        pdf = pypdf.PdfReader(f)
-        # Obtenemos el número de páginas
-        num_pags = pdf.getNumPages()
-        count = 0
-        text = []
-        # Iteramos sobre las páginas
-        for pag in pdf.pages:
-            count +=1
-            texto_pagina = pag.extract_text()
-            tablas = tabula.read_pdf(pdf_path, pages=count)
-            for tabla in tablas:
-                texto_pagina += f'; {tabla_a_texto(tabla=tabla)}; '
-            texto_pagina = limpieza_texto(texto_pagina)
-            text.append(texto_pagina)
+    #with open(pdf_path, 'rb') as f:
+    f = pdf_path
+    pdf = pypdf.PdfReader(f)
+    # Obtenemos el número de páginas
+    num_pags = len(pdf.pages)
+    count = 0
+    text = []
+    # Iteramos sobre las páginas
+    for pag in pdf.pages:
+        count +=1
+        texto_pagina = pag.extract_text()
+        tablas = tabula.read_pdf(pdf_path, pages=count)
+        for tabla in tablas:
+            texto_pagina += f'; {tabla_a_texto(tabla=tabla)}; '
+        texto_pagina = limpieza_texto(texto_pagina)
+        text.append(texto_pagina)
     return text
 
 #############################
@@ -193,6 +200,9 @@ def save_text_pdf_to_csv(save_path: str, text: list):
         writer.writerows([[str(i)] for i in text])
     return
 
+def contador_tokens(texto, tokenizador= tiktoken.get_encoding('cl100k_base')):
+    return len(tokenizador.encode(texto, disallowed_special=()))
+
 def create_index_from_csv(csv_path: str):
     '''
     Función para crear un índice de búsqueda de un csv.
@@ -203,6 +213,9 @@ def create_index_from_csv(csv_path: str):
     index = VectorstoreIndexCreator().from_loaders([loader])
     return index
     
+
+
+
 #############################
 # OpenAI embeddings & queries
 #############################
