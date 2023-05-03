@@ -8,6 +8,7 @@ __pycache__/
 data/
 data/creds/gpt_id.json
 gpt_id.json
+codigo_sin_implementar/
 
 # C extensions
 *.so

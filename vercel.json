@@ -3,7 +3,7 @@
     "builds": [
       {
         "use": "@vercel/python",
-        "src": "app.py",
+        "entrypoint": "panel serve app.py --port $PORT --address 0.0.0.0",
         "config": {
           "maxLambdaSize": "50mb"
         }
@@ -12,7 +12,7 @@
     "routes": [
       {
         "src": "/(.*)",
-        "dest": "/"
+        "dest": "/app.py"
       }
     ]
   }
