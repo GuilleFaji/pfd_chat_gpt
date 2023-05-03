@@ -139,9 +139,7 @@ def pdf_to_vectorstore(_, svm_retriever=True):
 
     documentos = tk_splitter.create_documents(
         texto, 
-        metadatas=[{'source': f'{archivo} pag.{i}'}
-                for i in list(range(len(texto)))]
-        )
+        metadatas=[{'source': f'{archivo} pag.{i}'} for i in list(range(len(texto)))])
     
     embedding = langchain.embeddings.openai.OpenAIEmbeddings()
     
