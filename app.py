@@ -26,7 +26,7 @@ from langchain.retrievers import SVMRetriever
 import panel as pn
 import tempfile
 '''
-panel serve "D:\tests\pfd_chat_gpt\app.py" --address 0.0.0.0 --port 7680 --allow-websocket-origin 0.0.0.0:7680
+panel serve "D:\tests\pfd_chat_gpt\app.py" --address 0.0.0.0 --port 7680 --allow-websocket-origin 0.0.0.0:7680 --allow-websocket-origin localhost:7680
 '''
 
 #############################
@@ -36,7 +36,7 @@ try :
     api_key = json.load(open('./data/creds/gpt_id.json'))['api_key']
     openai.api_key = api_key
     os.environ['OPENAI_API_KEY'] = api_key
-    text_key = 'Clave OPENAI encontrada. Se usará por defecto.'
+    text_key = 'Clave OPENAI encontrada. Se usara por defecto.'
 except:
     api_key = ''
     text_key = 'Introduzca su clave OPENAI.'
@@ -177,7 +177,7 @@ def pregunta(vector_store, query, chain_type, k):
 
 convos = [pn.Row(
             pn.panel("\U0001F916", width=10),
-            pn.Column(f'**Aquí apareceran las preguntas, respuestas y sus contextos!**'))]  # store all panel objects in a list
+            pn.Column(f'**Aqui apareceran las preguntas, respuestas y sus contextos!**'))]  # store all panel objects in a list
 
 def qa_result(_):
     os.environ["OPENAI_API_KEY"] = openaikey.value
