@@ -3,7 +3,6 @@
     "builds": [
       {
         "use": "@vercel/python",
-        "entrypoint": "panel serve app.py --port $PORT --address 0.0.0.0",
         "config": {
           "maxLambdaSize": "50mb"
         }
