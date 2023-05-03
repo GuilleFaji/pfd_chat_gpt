@@ -32,9 +32,12 @@ from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 
 # API KEY:
 # ToDo: Cambiar a variable de entorno
-api_key = json.load(open('./data/creds/gpt_id.json'))['api_key']
-openai.api_key = api_key
-os.environ['OPENAI_API_KEY'] = api_key
+try:
+    api_key = json.load(open('./data/creds/gpt_id.json'))['api_key']
+    openai.api_key = api_key
+    os.environ['OPENAI_API_KEY'] = api_key
+except:
+    None
 
 ###############
 # Text Handling
