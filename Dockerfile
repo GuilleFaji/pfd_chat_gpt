@@ -6,6 +6,9 @@ COPY requirements.txt .
 COPY app.py .
 COPY utils.py .
 
+# Hacemos que se instale Java en el contenedor (tabula lo necesita):
+RUN apt-get update && apt-get install -y openjdk-11-jre-headless
+
 RUN pip install -r requirements.txt
 
 # EXPOSE 8080
