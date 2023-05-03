@@ -77,7 +77,7 @@ prompt = pn.widgets.TextEditor(
     value="", placeholder="Pregunta cualquier cosa", height=160, toolbar=False
 )
 
-# Botón de Pregunta:
+# Boton de Pregunta:
 run_button = pn.widgets.Button(name="Preguntar")
 
 # Selector de nº de fragmentos:
@@ -157,7 +157,7 @@ def pregunta(vector_store, query, chain_type, k):
     recuperador = current_vector_store.as_retriever(
         search_type="similarity",
         search_kwargs={"k": k})'''
-    # Usamos SVM Retriever. Es más caro computacionalmente pero más preciso.
+    # Usamos SVM Retriever. Es mas caro computacionalmente pero mas preciso.
     # Karpathy: https://twitter.com/karpathy/status/1647025230546886658
     recuperador = vector_store
     
