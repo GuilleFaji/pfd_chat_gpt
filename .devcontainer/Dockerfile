@@ -2,9 +2,9 @@ FROM python:3.10.4
 
 WORKDIR /code
 
+COPY utils.py .
 COPY requirements.txt .
 COPY app.py .
-COPY utils.py .
 
 # Hacemos que se instale Java en el contenedor (tabula lo necesita):
 RUN apt-get update && apt-get install -y openjdk-11-jre-headless
